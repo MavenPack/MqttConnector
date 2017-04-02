@@ -51,8 +51,7 @@ public class MqttServerTask extends Thread implements MqttCallbackExtended {
 
 	/**
 	 * 
-	 * @param confPath mqtt config file
-	 * @param sslConfPath mqtt ssl config file
+	 * @param confPath the path of mqtt config file
 	 */
 	public MqttServerTask(String confPath) {
 		this.mConfPath = confPath;
@@ -152,12 +151,9 @@ public class MqttServerTask extends Thread implements MqttCallbackExtended {
 			lastException = e;
 			return;
 		}
-//		mSSLProperties.setProperty("com.ibm.ssl.keyStore", mConfPath+getSSLConfValue("com.ibm.ssl.keyStore", ""));
-//		mSSLProperties.setProperty("com.ibm.ssl.trustStore", mConfPath+getSSLConfValue("com.ibm.ssl.trustStore", ""));
-//		if(getSSLConfValue("com.ibm.ssl.privateStore","").length()>0) {
-//			mSSLProperties.setProperty("com.ibm.ssl.privateStore", mConfPath+getSSLConfValue("com.ibm.ssl.privateStore", ""));
-//		}
 		pushMsgQueue = new LinkedBlockingQueue<PushMqttMessage>(ConvertUtils.parseInt(getConfValue("mqtt.push.messagequeue", "1000"), -1));
+		int retryTimesLimit = 5;
+		int retryTimes=0;
 		while(true) {
 			try {
 				connnect();
@@ -165,9 +161,15 @@ public class MqttServerTask extends Thread implements MqttCallbackExtended {
 				break;
 			} catch (MqttException e) {
 				logger.debug(CommonUtils.getExceptionInfo(e));
-				try {
-					Thread.sleep(2*1000);
-				} catch (InterruptedException e1) { }
+				if(retryTimes > retryTimesLimit) {
+					lastException = e;
+					return;
+				} else {
+					try {
+						Thread.sleep(2*1000);
+					} catch (InterruptedException e1) { }
+					retryTimes ++;
+				}
 			}
 		}
 		while(runningTask) {
