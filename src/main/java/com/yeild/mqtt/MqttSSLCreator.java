@@ -2,14 +2,22 @@ package com.yeild.mqtt;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.KeyFactory;
+import java.security.KeyManagementException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 
 import javax.net.ssl.KeyManagerFactory;
@@ -22,9 +30,13 @@ import org.apache.commons.codec.binary.Base64;
 public class MqttSSLCreator {
 	public static SSLSocketFactory getSSLSocktet(String caPath, String crtPath, String keyPath, String password)
 			throws Exception {
+		return getSSLSocktet(new FileInputStream(caPath), new FileInputStream(crtPath), new FileInputStream(keyPath), password);
+	}
+	
+	public static SSLSocketFactory getSSLSocktet(InputStream caIn, InputStream crtIn, InputStream keyPath, String password)
+			throws CertificateException, KeyStoreException, NoSuchAlgorithmException, IOException, UnrecoverableKeyException, KeyManagementException, InvalidKeySpecException {
 		// CA certificate is used to authenticate server
 		CertificateFactory cAf = CertificateFactory.getInstance("X.509");
-		FileInputStream caIn = new FileInputStream(caPath);
 		X509Certificate ca = (X509Certificate) cAf.generateCertificate(caIn);
 		KeyStore caKs = KeyStore.getInstance("JKS");
 		caKs.load(null, null);
@@ -33,7 +45,6 @@ public class MqttSSLCreator {
 		tmf.init(caKs);
 
 		CertificateFactory cf = CertificateFactory.getInstance("X.509");
-		FileInputStream crtIn = new FileInputStream(crtPath);
 		X509Certificate caCert = (X509Certificate) cf.generateCertificate(crtIn);
 
 		crtIn.close();
@@ -52,19 +63,16 @@ public class MqttSSLCreator {
 		return context.getSocketFactory();
 	}
 
-	public static PrivateKey getPrivateKey(String path) throws Exception {
-
+	public static PrivateKey getPrivateKey(InputStream path) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
 		org.apache.commons.codec.binary.Base64 base64 = new Base64();
 		byte[] buffer = base64.decode(getPem(path));
-
 		PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(buffer);
 		KeyFactory keyFactory = KeyFactory.getInstance("RSA");
 		return (RSAPrivateKey) keyFactory.generatePrivate(keySpec);
 
 	}
 
-	private static String getPem(String path) throws Exception {
-		FileInputStream fin = new FileInputStream(path);
+	private static String getPem(InputStream fin) throws IOException {
 		BufferedReader br = new BufferedReader(new InputStreamReader(fin));
 		String readLine = null;
 		StringBuilder sb = new StringBuilder();
