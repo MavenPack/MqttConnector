@@ -45,7 +45,7 @@ public class MqttServerTask extends Thread implements MqttCallbackExtended {
 	private boolean mIsLogined = false;
 	private Exception lastException;
 	
-	public interface OnMqttConnectorListener {public void onMqttReceiveMessage(MqttMessage pmessage);}
+	public interface OnMqttConnectorListener {public void onMqttReceiveMessage(PushMqttMessage pmessage);}
 	
 	private ArrayList<OnMqttConnectorListener> receiveMessageListeners = new ArrayList<OnMqttConnectorListener>(1);
 
@@ -72,6 +72,10 @@ public class MqttServerTask extends Thread implements MqttCallbackExtended {
 	}
 	public String getRpcRequestName() {
 		return rpcRequestName;
+	}
+	
+	public String getRpcTopicPrefix() {
+		return rpcTopicPrefix;
 	}
 	
 	public String getNotifyTopicPre() {
@@ -193,7 +197,7 @@ public class MqttServerTask extends Thread implements MqttCallbackExtended {
 
 	private void connnect() throws MqttException {
 		MqttConnectOptions connectOptions = new MqttConnectOptions();
-		connectOptions.setCleanSession(false);
+		connectOptions.setCleanSession(true);
 		String sslUrl = getConfValue("mqtt.uri.ssl");
 		SSLSocketFactory sslSocketFac = null;
 		if(sslUrl != null) {
@@ -261,7 +265,7 @@ public class MqttServerTask extends Thread implements MqttCallbackExtended {
 	public void messageArrived(String topic, MqttMessage message) throws Exception {
 		String msgcontent = new String(message.getPayload(), "UTF-8");
 		logger.debug(topic+" received:"+msgcontent);
-		if(topic.startsWith(rpcTopicPrefix)) {
+//		if(topic.startsWith(rpcTopicPrefix)) {
 			PushMqttMessage mqttMessage = new PushMqttMessage(topic, message);
 			for(OnMqttConnectorListener tListener : receiveMessageListeners) {
 				try {
@@ -270,7 +274,7 @@ public class MqttServerTask extends Thread implements MqttCallbackExtended {
 					logger.error(CommonUtils.getExceptionInfo(e));
 				}
 			}
-		}
+//		}
 	}
 
 	@Override
