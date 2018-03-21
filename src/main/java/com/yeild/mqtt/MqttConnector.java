@@ -18,7 +18,7 @@ import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import com.yeild.common.Utils.CommonUtils;
 import com.yeild.mqtt.listener.OnMqttConnectorListener;
 
-public class MqttServerTask extends Thread implements MqttCallbackExtended {
+public class MqttConnector extends Thread implements MqttCallbackExtended {
 	Logger logger = Logger.getLogger(getClass().getSimpleName());
 	private MqttClient mqttClient;
 	private MqttConfig mqttConfig;
@@ -34,7 +34,7 @@ public class MqttServerTask extends Thread implements MqttCallbackExtended {
 	 * 
 	 * @param confPath the path of mqtt config file
 	 */
-	public MqttServerTask(String confPath) {
+	public MqttConnector(String confPath) {
 		this.mConfPath = confPath;
 	}
 	

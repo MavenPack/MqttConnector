@@ -1,4 +1,4 @@
-package com.yeild.mqtt.MqttConnector;
+package com.yeild.mqtt;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
