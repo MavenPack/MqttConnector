@@ -22,6 +22,10 @@
 			<id>Eclipse Paho Repo</id>
 			<url>https://repo.eclipse.org/content/repositories/paho-releases/</url>
 		</repository>
+		<repository>
+		    <id>jitpack.io</id>
+		    <url>https://jitpack.io</url>
+		</repository>
 	</repositories>
 
 	<profiles>
@@ -53,10 +57,9 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>com.yeild.common</groupId>
-			<artifactId>Utils</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
-			<classifier>${jdk.classifier}</classifier>
+		    <groupId>com.github.MavenPack</groupId>
+		    <artifactId>Utils</artifactId>
+		    <version>0.1</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-codec</groupId>
