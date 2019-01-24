@@ -14,7 +14,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<jdk.version>1.8</jdk.version>
 		<jdk.classifier></jdk.classifier>
-		<mqtt.paho.version>1.1.0</mqtt.paho.version>
+		<mqtt.paho.version>1.2.0</mqtt.paho.version>
 	</properties>
 
 	<repositories>

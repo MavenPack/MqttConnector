@@ -34,8 +34,12 @@ public class MqttConfig {
 	private int maxMessageQueue = 0;
 	
 	public MqttConfig() {
+		init();
+	}
+	
+	private void init() {
 		try {
-			load("");
+			load(null);
 		} catch (IOException e) {
 		}
 	}
@@ -144,6 +148,15 @@ public class MqttConfig {
 		return maxMessageQueue;
 	}
 	
+	public void createSslSocketFac(String caPath, String crtPath, String keyPath, String password) throws Exception {
+		sslSocketFac = MqttSSLCreator.getSSLSocktet(caPath, crtPath, keyPath, password);
+	}
+	
+    /**
+     * load config from file
+     * @param path
+     * @throws IOException
+     */
 	public void load(String path) throws IOException {
 		mConfPath = path;
 		if(!loadConfig() || !loadSSLConfig()) {
@@ -151,41 +164,23 @@ public class MqttConfig {
 		}
 		maxMessageQueue = Integer.parseInt(getConfValue("mqtt.push.messagequeue", "1000"));
 		mUri = getConfValue("mqtt.uri.ssl");
-		if(mUri != null && mUri.length() > 0) {
+		if(!isEmpty(mUri) && !isEmpty(mConfPath)) {
 			try {
-//				try {
-					sslSocketFac = MqttSSLCreator.getSSLSocktet(mConfPath+getSSLConfValue("com.ibm.ssl.trustStore")
-							, mConfPath+getSSLConfValue("com.ibm.ssl.keyStore")
-							,mConfPath+ getSSLConfValue("com.ibm.ssl.privateStore")
-							, getSSLConfValue("com.ibm.ssl.keyStorePassword"));
-//				}
-//				catch (FileNotFoundException e) {
-//					logger.debug(CommonUtils.getExceptionInfo(e));
-//		    		logger.debug("Could not find ssl file in path " + mConfPath);
-//		    		logger.debug("Try to use default ssl file.");
-//					ClassLoader classLoader = getClass().getClassLoader();
-//					sslSocketFac = MqttSSLCreator.getSSLSocktet(classLoader.getResourceAsStream(getSSLConfValue("com.ibm.ssl.trustStore"))
-//							, classLoader.getResourceAsStream(getSSLConfValue("com.ibm.ssl.keyStore"))
-//							, classLoader.getResourceAsStream(getSSLConfValue("com.ibm.ssl.privateStore"))
-//							, getSSLConfValue("com.ibm.ssl.keyStorePassword"));
-//				}
+				createSslSocketFac(mConfPath+getSSLConfValue("com.ibm.ssl.trustStore")
+						, mConfPath+getSSLConfValue("com.ibm.ssl.keyStore")
+						,mConfPath+ getSSLConfValue("com.ibm.ssl.privateStore")
+						, getSSLConfValue("com.ibm.ssl.keyStorePassword"));
 			}
 			catch (Exception e) {
 				logger.error(CommonUtils.getExceptionInfo(e));
 			}
 		}
-		if(mUri == null || sslSocketFac == null) {
+		if(isEmpty(mUri) || sslSocketFac == null) {
 			mUri = getConfValue("mqtt.uri.tcp");
-		}
-		if(isEmpty(mUri)) {
-			throw new IOException("uri not found");
 		}
 		mUsername = getConfValue("mqtt.username", "");
 		mPassword = getConfValue("mqtt.password", "");
 		mClientid = getConfValue("mqtt.clientid", "");
-		if(isEmpty(mUsername) && isEmpty(mClientid)) {
-			throw new IOException("No username and clientid");
-		}
 		keepalive = Integer.parseInt(getConfValue("mqtt.keepalive", "60"));
 		mWillTopic = getConfValue("mqtt.willtopic","/server/bus/status")+"/"+getConfValue("mqtt.clientid", "bus_server");
 		mWillMsg = getConfValue("mqtt.willmsg","0");
@@ -196,6 +191,16 @@ public class MqttConfig {
 		rpcTopicPrefix = getConfValue("mqtt.rpctopic","/server/rpc")+"/"
 				+ getConfValue("mqtt.clientid", "bus_server")
 				+ rpcRequestName;
+	}
+	
+	public boolean checkValid() throws Exception {
+		if(isEmpty(mUri)) {
+			throw new Exception("uri not found");
+		}
+		if(isEmpty(mUsername) && isEmpty(mClientid)) {
+			throw new Exception("No username and clientid");
+		}
+		return true;
 	}
 	
 	private boolean isEmpty(String val) {
@@ -231,20 +236,22 @@ public class MqttConfig {
 			confInputStream = null;
 			mProperties = new Properties(defProperties);
 		}
-		try {
-			File confFile = new File(mConfPath + mMqttConfName);
-			confInputStream = new FileInputStream(confFile);
-			mProperties.load(confInputStream);
-			confInputStream.close();
-			confInputStream = null;
-		} catch (IOException e) {
-    		logger.debug("Could not find mqtt config file for path " + mConfPath + mMqttConfName);
-    		logger.debug("Use default mqtt config.");
-		} finally {
-			if (confInputStream != null) {
-				try {
-					confInputStream.close();
-				} catch (IOException e) {
+		if(!isEmpty(mConfPath)) {
+			try {
+				File confFile = new File(mConfPath + mMqttConfName);
+				confInputStream = new FileInputStream(confFile);
+				mProperties.load(confInputStream);
+				confInputStream.close();
+				confInputStream = null;
+			} catch (IOException e) {
+	    		logger.debug("Could not find mqtt config file for path " + mConfPath + mMqttConfName);
+	    		logger.debug("Use default mqtt config.");
+			} finally {
+				if (confInputStream != null) {
+					try {
+						confInputStream.close();
+					} catch (IOException e) {
+					}
 				}
 			}
 		}
@@ -264,18 +271,20 @@ public class MqttConfig {
 			confInputStream = null;
 			mSSLProperties = new Properties(defSSLProperties);
 		}
-		try {
-			File confFile = new File(mConfPath + mSSLConfName);
-			confInputStream = new FileInputStream(confFile);
-			mSSLProperties.load(confInputStream);
-		} catch (IOException e) {
-    		logger.debug("Could not find mqtt ssl config file for path " + mConfPath + mSSLConfName);
-    		logger.debug("Use default mqtt ssl config.");
-		} finally {
-			if (confInputStream != null) {
-				try {
-					confInputStream.close();
-				} catch (IOException e) {
+		if(!isEmpty(mConfPath)) {
+			try {
+				File confFile = new File(mConfPath + mSSLConfName);
+				confInputStream = new FileInputStream(confFile);
+				mSSLProperties.load(confInputStream);
+			} catch (IOException e) {
+	    		logger.debug("Could not find mqtt ssl config file for path " + mConfPath + mSSLConfName);
+	    		logger.debug("Use default mqtt ssl config.");
+			} finally {
+				if (confInputStream != null) {
+					try {
+						confInputStream.close();
+					} catch (IOException e) {
+					}
 				}
 			}
 		}

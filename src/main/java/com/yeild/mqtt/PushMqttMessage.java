@@ -6,6 +6,8 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 public class PushMqttMessage extends MqttMessage {
 	private String topic;
+	private int retry_count = 0;
+	private boolean isRpc;
 	
 	public PushMqttMessage() {
 	}
@@ -40,5 +42,20 @@ public class PushMqttMessage extends MqttMessage {
 		this.topic = topic.replaceAll("[^0-9a-zA-Z/_\\-+#]*", "");
 	}
 	
+	public void setRetry_count(int retry_count) {
+		this.retry_count = retry_count;
+	}
+	
+	public int getRetry_count() {
+		return retry_count;
+	}
+	
+	public boolean isRpc() {
+		return isRpc;
+	}
+
+	public void setRpc(boolean isRpc) {
+		this.isRpc = isRpc;
+	}
 	
 }

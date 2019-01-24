@@ -16,7 +16,7 @@ import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 
 import com.yeild.common.Utils.CommonUtils;
-import com.yeild.mqtt.listener.OnMqttConnectorListener;
+import com.yeild.mqtt.listener.OnMqttMessageListener;
 
 public class MqttConnector extends Thread implements MqttCallbackExtended {
 	Logger logger = Logger.getLogger(getClass().getSimpleName());
@@ -28,7 +28,7 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 	private boolean mIsLogined = false;
 	private Exception lastException;
 	
-	private ArrayList<OnMqttConnectorListener> receiveMessageListeners = new ArrayList<OnMqttConnectorListener>(1);
+	private ArrayList<OnMqttMessageListener> messageListeners = new ArrayList<OnMqttMessageListener>(1);
 
 	/**
 	 * 
@@ -37,30 +37,23 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 	public MqttConnector(String confPath) {
 		this.mConfPath = confPath;
 	}
+
+	public MqttConnector(MqttConfig config) {
+		this.mqttConfig = config;
+	}
 	
-	public void addMqttConnectorListener(OnMqttConnectorListener pListener) {
-		if(!this.receiveMessageListeners.contains(pListener)) {
-			this.receiveMessageListeners.add(pListener);
+	public MqttConfig getMqttConfig() {
+		return mqttConfig;
+	}
+	
+	public void addMqttMessageListener(OnMqttMessageListener pListener) {
+		if(!this.messageListeners.contains(pListener)) {
+			this.messageListeners.add(pListener);
 		}
 	}
 	
-	public void removeMqttConnectorListener(OnMqttConnectorListener pListener) {
-		this.receiveMessageListeners.remove(pListener);
-	}
-	
-	public String getRpcResponseName() {
-		return mqttConfig.getRpcResponseName();
-	}
-	public String getRpcRequestName() {
-		return mqttConfig.getRpcRequestName();
-	}
-	
-	public String getRpcTopicPrefix() {
-		return mqttConfig.getRpcTopicPrefix();
-	}
-	
-	public String getNotifyTopicPre() {
-		return mqttConfig.getNotifyTopicPre();
+	public void removeMqttMessageListener(OnMqttMessageListener pListener) {
+		this.messageListeners.remove(pListener);
 	}
 	
 	public boolean isLogined() {
@@ -128,11 +121,20 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 	@Override
 	public void run() {
 		mIsLogined = false;
-		mqttConfig = new MqttConfig();
+		if(mqttConfig == null) {
+			mqttConfig = new MqttConfig();
+			try {
+				mqttConfig.load(mConfPath);
+			} catch (IOException e) {
+				lastException = e;
+				return;
+			}
+		}
 		try {
-			mqttConfig.load(mConfPath);
-		} catch (IOException e) {
-			lastException = e;
+			mqttConfig.checkValid();
+		} catch (Exception e2) {
+			lastException = e2;
+			logger.error(CommonUtils.getExceptionInfo(e2));
 			return;
 		}
 		pushMsgQueue = new LinkedBlockingQueue<PushMqttMessage>(mqttConfig.getMaxMessageQueue());
@@ -145,6 +147,7 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 				break;
 			} catch (MqttException e) {
 				logger.debug(CommonUtils.getExceptionInfo(e));
+				logger.debug(mqttConfig.getUsername()+"----"+mqttConfig.getPassword());
 				if(retryTimes > retryTimesLimit) {
 					lastException = e;
 					return;
@@ -162,44 +165,30 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 				pushMsg = pushMsgQueue.take();
 				if(!mqttClient.isConnected()) {
 					this.pushMessage(pushMsg);
-					Thread.sleep(1*1000);
+					Thread.sleep(2*1000);
 					continue;
 				}
-				mqttClient.publish(pushMsg.getTopic(), (MqttMessage)pushMsg);
 			} catch (Exception e) {
 				e.printStackTrace();
 				if(pushMsg != null) {
 					this.pushMessage(pushMsg);
 				}
 			}
+			try {
+				mqttClient.publish(pushMsg.getTopic(), pushMsg);
+				callPushMessageResult(pushMsg, null);
+			} catch (MqttException e) {
+				logger.error(CommonUtils.getExceptionInfo(e));
+				callPushMessageResult(pushMsg, new Error(e.getMessage()));
+				try {
+					Thread.sleep(1*1000);
+				} catch (InterruptedException e1) { }
+				if(pushMsg != null) {
+					pushMsg.setRetry_count(pushMsg.getRetry_count()+1);
+					this.pushMessage(pushMsg);
+				}
+			}
 		}
-	}
-
-	private void connnect() throws MqttException {
-		MqttConnectOptions connectOptions = new MqttConnectOptions();
-		connectOptions.setCleanSession(true);
-		if(mqttConfig.getUri() != null && mqttConfig.getSslSocketFac() != null) {
-			connectOptions.setSocketFactory(mqttConfig.getSslSocketFac());
-			logger.debug("mqtt will login with ssl");
-		} else {
-			logger.debug("mqtt will login with tcp");
-		}
-		connectOptions.setServerURIs(new String[]{mqttConfig.getUri()});
-		String username = mqttConfig.getUsername();
-		if(username.length()>1) {
-			connectOptions.setUserName(username);
-			connectOptions.setPassword(mqttConfig.getPassword().toCharArray());
-		}
-		connectOptions.setConnectionTimeout(10);
-		connectOptions.setKeepAliveInterval(mqttConfig.getKeepalive());
-		connectOptions.setAutomaticReconnect(true);
-		connectOptions.setWill(mqttConfig.getWillTopic(), mqttConfig.getWillMsg().getBytes(), 2, true);
-		
-		mqttClient = new MqttClient(mqttConfig.getUri(), mqttConfig.getClientid(), new MqttDefaultFilePersistence(mConfPath+"/../mqtt"));
-		mqttClient.setCallback(this);
-		mqttClient.setTimeToWait(10*1000);
-		
-		mqttClient.connect(connectOptions);
 	}
 
 	@Override
@@ -214,13 +203,8 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 		String msgcontent = new String(message.getPayload(), "UTF-8");
 		logger.debug(topic+" received:"+msgcontent);
 		PushMqttMessage mqttMessage = new PushMqttMessage(topic, message);
-		for(OnMqttConnectorListener tListener : receiveMessageListeners) {
-			try {
-				tListener.onMqttReceiveMessage(mqttMessage);
-			} catch (Exception e) {
-				logger.error(CommonUtils.getExceptionInfo(e));
-			}
-		}
+		mqttMessage.setRpc(topic.startsWith(mqttConfig.getRpcTopicPrefix()));
+		callReceiveMessage(mqttMessage);
 	}
 
 	@Override
@@ -255,5 +239,52 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 			return;
 		}
 		mIsLogined = true;
+	}
+
+	private void connnect() throws MqttException {
+		MqttConnectOptions connectOptions = new MqttConnectOptions();
+		connectOptions.setCleanSession(true);
+		if(mqttConfig.getUri() != null && mqttConfig.getSslSocketFac() != null) {
+			connectOptions.setSocketFactory(mqttConfig.getSslSocketFac());
+			logger.debug("mqtt will login with ssl");
+		} else {
+			logger.debug("mqtt will login with tcp");
+		}
+		connectOptions.setServerURIs(new String[]{mqttConfig.getUri()});
+		String username = mqttConfig.getUsername();
+		if(username.length()>1) {
+			connectOptions.setUserName(username);
+			connectOptions.setPassword(mqttConfig.getPassword().toCharArray());
+		}
+		connectOptions.setConnectionTimeout(10);
+		connectOptions.setKeepAliveInterval(mqttConfig.getKeepalive());
+		connectOptions.setAutomaticReconnect(true);
+		connectOptions.setWill(mqttConfig.getWillTopic(), mqttConfig.getWillMsg().getBytes(), 2, true);
+		
+		mqttClient = new MqttClient(mqttConfig.getUri(), mqttConfig.getClientid(), new MqttDefaultFilePersistence(mConfPath+"/../mqtt"));
+		mqttClient.setCallback(this);
+		mqttClient.setTimeToWait(10*1000);
+		
+		mqttClient.connect(connectOptions);
+	}
+	
+	private void callReceiveMessage(PushMqttMessage message) {
+		for(OnMqttMessageListener tListener : messageListeners) {
+			try {
+				tListener.onMqttReceiveMessage(message);
+			} catch (Exception e) {
+				logger.error(CommonUtils.getExceptionInfo(e));
+			}
+		}
+	}
+	
+	private void callPushMessageResult(PushMqttMessage message, Error error) {
+		for(OnMqttMessageListener tListener : messageListeners) {
+			try {
+				tListener.pushMessageResult(message, error);
+			} catch (Exception e) {
+				logger.error(CommonUtils.getExceptionInfo(e));
+			}
+		}
 	}
 }
