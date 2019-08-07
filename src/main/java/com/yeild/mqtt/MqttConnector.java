@@ -18,17 +18,17 @@ import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
 import com.yeild.common.Utils.CommonUtils;
 import com.yeild.mqtt.listener.OnMqttMessageListener;
 
-public class MqttConnector extends Thread implements MqttCallbackExtended {
-	Logger logger = Logger.getLogger(getClass().getSimpleName());
-	private MqttClient mqttClient;
-	private MqttConfig mqttConfig;
-	private String mConfPath;
-	private LinkedBlockingQueue<PushMqttMessage> pushMsgQueue = null;
-	private boolean runningTask = true;
-	private boolean mIsLogined = false;
-	private Exception lastException;
+public class MqttConnector implements Runnable,MqttCallbackExtended {
+	protected Logger logger = Logger.getLogger(getClass());
+	protected MqttClient mqttClient;
+	protected MqttConfig mqttConfig;
+	protected String mConfPath;
+	protected LinkedBlockingQueue<PushMqttMessage> pushMsgQueue = null;
+	protected boolean runningTask = true;
+	protected boolean mIsLogined = false;
+	protected Exception lastException;
 	
-	private ArrayList<OnMqttMessageListener> messageListeners = new ArrayList<OnMqttMessageListener>(1);
+	protected ArrayList<OnMqttMessageListener> messageListeners = new ArrayList<OnMqttMessageListener>(1);
 
 	/**
 	 * 
@@ -222,23 +222,26 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 		if(reconnect) {
 			logger.info("mqtt reconnect success");
 		}
+		initAfterConnect();
+	}
+	
+	protected void initAfterConnect() {
 		try {
-			mqttClient.subscribe(mqttConfig.getRpcTopicPrefix()+"#", 0);
+			mqttClient.subscribeWithResponse(mqttConfig.getRpcTopicPrefix()+"#", 0).waitForCompletion();
 			
 			PushMqttMessage onlineMsg = new PushMqttMessage();
 			onlineMsg.setTopic(mqttConfig.getWillTopic());
 			onlineMsg.setPayload("1".getBytes());
-			onlineMsg.setQos(0);
+			onlineMsg.setQos(1);
 			onlineMsg.setRetained(true);
 			if(!pushMessage(onlineMsg)) {
 				logger.debug("online push failed");
 			}
+			mIsLogined = true;
 		} catch (MqttException e) {
 			logger.error(CommonUtils.getExceptionInfo(e));
 			lastException = e;
-			return;
 		}
-		mIsLogined = true;
 	}
 
 	private void connnect() throws MqttException {
@@ -268,7 +271,7 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 		mqttClient.connect(connectOptions);
 	}
 	
-	private void callReceiveMessage(PushMqttMessage message) {
+	protected void callReceiveMessage(PushMqttMessage message) {
 		for(OnMqttMessageListener tListener : messageListeners) {
 			try {
 				tListener.onMqttReceiveMessage(message);
@@ -278,7 +281,7 @@ public class MqttConnector extends Thread implements MqttCallbackExtended {
 		}
 	}
 	
-	private void callPushMessageResult(PushMqttMessage message, Error error) {
+	protected void callPushMessageResult(PushMqttMessage message, Error error) {
 		for(OnMqttMessageListener tListener : messageListeners) {
 			try {
 				tListener.pushMessageResult(message, error);

@@ -30,6 +30,9 @@ import org.apache.commons.codec.binary.Base64;
 public class MqttSSLCreator {
 	public static SSLSocketFactory getSSLSocktet(String caPath, String crtPath, String keyPath, String password)
 			throws Exception {
+//		return new AppSocketFactory(new AppSocketFactory.SocketFactoryOptions()
+//				.withCaBksInputStream(new FileInputStream(caPath), "yeildserver")
+//				.withClientBksInputStream(new FileInputStream(crtPath), "yeildclient"));
 		return getSSLSocktet(new FileInputStream(caPath), new FileInputStream(crtPath), new FileInputStream(keyPath), password);
 	}
 	
@@ -48,7 +51,7 @@ public class MqttSSLCreator {
 		X509Certificate caCert = (X509Certificate) cf.generateCertificate(crtIn);
 
 		crtIn.close();
-		KeyStore ks = KeyStore.getInstance("JKS");
+		KeyStore ks = KeyStore.getInstance("PKCS12");
 		ks.load(null, null);
 		ks.setCertificateEntry("certificate", caCert);
 		ks.setKeyEntry("private-key", getPrivateKey(keyPath), password.toCharArray(),
@@ -56,7 +59,7 @@ public class MqttSSLCreator {
 		KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
 		kmf.init(ks, password.toCharArray());
 
-		SSLContext context = SSLContext.getInstance("TLSv1");
+		SSLContext context = SSLContext.getInstance("TLSv1.2");
 
 		context.init(kmf.getKeyManagers(), tmf.getTrustManagers(), new SecureRandom());
 
@@ -77,7 +80,7 @@ public class MqttSSLCreator {
 		String readLine = null;
 		StringBuilder sb = new StringBuilder();
 		while ((readLine = br.readLine()) != null) {
-			if (readLine.charAt(0) == '-') {
+			if (readLine.length() > 0 && readLine.charAt(0) == '-') {
 				continue;
 			} else {
 				sb.append(readLine);

@@ -13,25 +13,25 @@ import org.apache.log4j.Logger;
 import com.yeild.common.Utils.CommonUtils;
 
 public class MqttConfig {
-	Logger logger = Logger.getLogger(getClass().getSimpleName());
+	protected Logger logger = Logger.getLogger(getClass().getSimpleName());
 	private static String mMqttConfName = "mqtt.properties";
 	private static String mSSLConfName = "ssl.properties";
-	private Properties mProperties = null;
-	private Properties mSSLProperties = null;
-	private String mConfPath;
-	private String mUri;
-	private String mUsername;
-	private String mPassword;
-	private String mClientid;
-	private int keepalive = 60;
-	private SSLSocketFactory sslSocketFac = null;
-	private String mWillTopic = null;
-	private String mWillMsg = "0";
-	private String rpcTopicPrefix="/server/rpc/";
-	private String rpcResponseName = null;
-	private String rpcRequestName = null;
-	private String mNotifyTopicPre = null;
-	private int maxMessageQueue = 0;
+	protected Properties mProperties = null;
+	protected Properties mSSLProperties = null;
+	protected String mConfPath;
+	protected String mUri;
+	protected String mUsername;
+	protected String mPassword;
+	protected String mClientid;
+	protected int keepalive = 60;
+	protected SSLSocketFactory sslSocketFac = null;
+	protected String mWillTopic = null;
+	protected String mWillMsg = "0";
+	protected String rpcTopicPrefix="/server/rpc/";
+	protected String rpcResponseName = null;
+	protected String rpcRequestName = null;
+	protected String mNotifyTopicPre = null;
+	protected int maxMessageQueue = 0;
 	
 	public MqttConfig() {
 		init();
@@ -178,19 +178,21 @@ public class MqttConfig {
 		if(isEmpty(mUri) || sslSocketFac == null) {
 			mUri = getConfValue("mqtt.uri.tcp");
 		}
+		String rpcpre = getConfValue("mqtt.rpctopic","/rpc");
 		mUsername = getConfValue("mqtt.username", "");
 		mPassword = getConfValue("mqtt.password", "");
 		mClientid = getConfValue("mqtt.clientid", "");
+		if(isEmpty(mClientid)) {
+			throw new IOException("the clientid not configured");
+		}
 		keepalive = Integer.parseInt(getConfValue("mqtt.keepalive", "60"));
-		mWillTopic = getConfValue("mqtt.willtopic","/server/bus/status")+"/"+getConfValue("mqtt.clientid", "bus_server");
+		mWillTopic = rpcpre +"/"+mClientid+"/"+getConfValue("mqtt.willtopic", "status");
 		mWillMsg = getConfValue("mqtt.willmsg","0");
 		
-		rpcRequestName = getConfValue("mqtt.rpc.request.name", "/request/");
-		rpcResponseName = getConfValue("mqtt.rpc.response.name", "/response/");
-		mNotifyTopicPre = getConfValue("mqtt.topic.notify", "/server/notify")+"/"+getConfValue("mqtt.clientid", "bus_server")+"/";
-		rpcTopicPrefix = getConfValue("mqtt.rpctopic","/server/rpc")+"/"
-				+ getConfValue("mqtt.clientid", "bus_server")
-				+ rpcRequestName;
+		rpcRequestName = getConfValue("mqtt.rpc.request.name", "/req/");
+		rpcResponseName = getConfValue("mqtt.rpc.response.name", "/resp/");
+		mNotifyTopicPre = rpcpre +"/"+mClientid+"/"+getConfValue("mqtt.topic.notify", "notify");
+		rpcTopicPrefix = rpcpre+"/" + mClientid + rpcRequestName;
 	}
 	
 	public boolean checkValid() throws Exception {
@@ -203,23 +205,23 @@ public class MqttConfig {
 		return true;
 	}
 	
-	private boolean isEmpty(String val) {
+	protected boolean isEmpty(String val) {
 		return val == null || val.length() < 1;
 	}
     
-    private String getConfValue(String key) {
+    public String getConfValue(String key) {
     	return getConfValue(key, null);
     }
     
-	private String getConfValue(String key, String defValue) {
+    public String getConfValue(String key, String defValue) {
     	return mProperties.getProperty(key, defValue);
     }
     
-	private String getSSLConfValue(String key) {
+    public String getSSLConfValue(String key) {
 		return getSSLConfValue(key, null);
 	}
 	
-    private String getSSLConfValue(String key, String defValue) {
+    public String getSSLConfValue(String key, String defValue) {
     	return mSSLProperties.getProperty(key, defValue);
     }
 
